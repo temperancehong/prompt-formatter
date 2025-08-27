@@ -28,7 +28,7 @@ disable_embedding: false
 
 This is a helpful tool that I built to facilitate Python code synthesis VQA tasks using few-shot prompting techniques. It allows you to format prompts.
 
-[Link to current version live demo](https://huggingface.co/spaces/)
+[Link to current version live demo](https://huggingface.co/spaces/temperancehong/few-shot-prompt-formatter)
 
 For now the prompt is in the following format:
 ```PlainText
