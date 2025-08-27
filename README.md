@@ -1,5 +1,5 @@
 ---
-title: "Medical VQA Few-shot Prompt Builder"
+title: "VQA Few-shot Prompt Builder"
 emoji: "🩺"
 colorFrom: "indigo"
 colorTo: "blue"
@@ -11,7 +11,7 @@ suggested_storage: "small"
 app_file: "app.py"
 fullWidth: true
 header: "mini"
-short_description: "Compose, preview, visualize, and export few-shot prompt examples for medical VQA."
+short_description: "Faster few-shot formatting for VQA."
 tags:
   - gradio
   - prompt-engineering
