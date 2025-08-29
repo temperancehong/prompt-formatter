@@ -12,7 +12,7 @@ DEFAULT_SYSTEM = (
 )
 
 DEFAULT_TEMPLATE = {
-    "include_sections": ["APIs", "Question", "Code", "Thought", "Answer"],  # per-example sections
+    "include_sections": ["APIs", "Question", "Thought", "Code",  "Answer"],  # per-example sections
     "apis_scope": "per",                        # "per" | "global"
     "show_system_in_preview": True,
     "show_global_apis_in_preview": True,        # only used when apis_scope == "global"
@@ -28,7 +28,6 @@ def read_rgb(img_path: str) -> np.array:
 
 DEFAULT_QUESTION = "What modality is this image?"
 DEFAULT_CODE = '''def answer_code():
-    img_array = read_rgb("path/to/the/image")
     cls = classify_image(img_array)
     return cls
 '''
