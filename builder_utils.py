@@ -86,7 +86,9 @@ def _validate_inputs_template(tmpl, system, global_apis, apis, question, code, a
     return True, ""
 
 def _build_text(tmpl, system, global_apis, apis, question, thought, code, answer):
-    """Render a formatted few-shot example according to the template & scope."""
+    """Render a formatted few-shot example according to the template & scope.
+       Arg order: (..., question, thought, code, answer)
+    """
     sections = set((tmpl or {}).get("include_sections", []))
     scope = (tmpl or {}).get("apis_scope", "per")
     show_system = bool((tmpl or {}).get("show_system_in_preview", True))
@@ -113,7 +115,6 @@ def _build_text(tmpl, system, global_apis, apis, question, thought, code, answer
         idx += 1
 
     if "Thought" in sections:
-        # Thought is optional text; include block even if empty, for consistency
         blocks.append(f"{idx}. Thought\n<THOUGHT>\n{(thought or '').strip()}\n</THOUGHT>\n")
         idx += 1
 
@@ -127,12 +128,6 @@ def _build_text(tmpl, system, global_apis, apis, question, thought, code, answer
 
     return "\n".join(blocks).strip()
 
-# def render_preview_with_template(tmpl, system, global_apis, apis, question, thought, code, answer):
-#     ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
-#     if not ok:
-#         return msg, None
-#     text = _build_text(tmpl, system, global_apis, apis, question, thought, code, answer)
-#     return text, text
 def render_preview_with_template(tmpl, system, global_apis, apis, question, thought, code, answer):
     # Only keep fields that are enabled in the template
     sections = set((tmpl or {}).get("include_sections", []))
@@ -153,10 +148,9 @@ def render_preview_with_template(tmpl, system, global_apis, apis, question, thou
     if not ok:
         return msg, None
 
-    # NOTE: _build_text expects args in the order (..., question, thought, code, answer)
+    # NOTE: _build_text expects (..., question, code, thought, answer)
     text = _build_text(tmpl, system, global_apis, apis, question, thought, code, answer)
     return text, text
-
 
 def to_json_record_with_template(tmpl, system, global_apis, apis, question, thought, code, answer):
     """
@@ -185,15 +179,15 @@ def to_json_record_with_template(tmpl, system, global_apis, apis, question, thou
 
     if "Question" in sections:
         rec["question"] = question
-    if "Code" in sections:
-        rec["code"] = code
     if "Thought" in sections:
         rec["thought"] = thought
+    if "Code" in sections:
+        rec["code"] = code
     if "Answer" in sections:
         rec["answer"] = answer
-
     return rec
 
+# 4) Add example wrapper
 def add_example_and_summarize_with_template(state, tmpl, system, global_apis, apis, question, thought, code, answer):
     ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
     if not ok:
@@ -201,6 +195,7 @@ def add_example_and_summarize_with_template(state, tmpl, system, global_apis, ap
     rec = to_json_record_with_template(tmpl, system, global_apis, apis, question, thought, code, answer)
     new_state = list(state) + [rec]
     return new_state, "✅ Added example.", len(new_state), dataset_rows(new_state)
+
 
 def _format_record_for_view(record):
     meta = record.get("meta") or {}
@@ -217,8 +212,8 @@ def _format_record_for_view(record):
         global_apis=record.get("global_apis"),
         apis=record.get("apis"),
         question=record.get("question"),
-        code=record.get("code"),
         thought=record.get("thought"),
+        code=record.get("code"),
         answer=record.get("answer"),
     )
 
@@ -232,7 +227,6 @@ def get_example_detail(state, index_one_based):
     record = state[idx - 1]
     return _format_record_for_view(record)
 
-# -------- delete helpers --------
 def delete_example(state, index_one_based):
     try:
         idx = int(float(index_one_based))
@@ -247,7 +241,6 @@ def delete_example_and_summarize(state, index_one_based):
     new_state, msg, count = delete_example(state, index_one_based)
     return new_state, msg, count, dataset_rows(new_state)
 
-# -------- export --------
 def export_jsonl_with_options(state, duplicate_system=True):
     """
     Export dataset to JSONL (per-line records).

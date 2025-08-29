@@ -134,10 +134,10 @@ def build_app():
                         gr.Markdown("Tip: copy from the preview box after rendering.")
 
                 preview_btn.click(
-                    render_preview_with_template,
-                    inputs=[template_state, system_global, global_apis, apis, question, thought, code, answer],
-                    outputs=[preview, copy_helper]
-                )
+                        render_preview_with_template,
+                        inputs=[template_state, system_global, global_apis, apis, question, thought, code, answer],
+                        outputs=[preview, copy_helper]
+                    )
 
             # -------------------- Dataset Builder Tab --------------------
             with gr.TabItem("Dataset Builder"):
