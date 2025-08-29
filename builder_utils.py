@@ -6,32 +6,24 @@ from datetime import datetime
 DEFAULT_SYSTEM = (
     "You are a helpful radiology assistant. Here I have one image, and please answer me the "
     "question by first providing your step by step thoughts in natural language using the supported "
-    "actions provided in the Python code APIs, and then output the corresponding consistant code that "
+    "actions provided in the Python code APIs, and then output the corresponding consistent code that "
     "use the APIs provided step by step. Finally, you execute the code, show me the intermediate "
     "results and the final answer, and then give me the response."
 )
 
 DEFAULT_TEMPLATE = {
-    "include_sections": ["APIs", "Question", "Code", "Answer"],
+    "include_sections": ["APIs", "Question", "Code", "Thought", "Answer"],  # per-example sections
+    "apis_scope": "per",                        # "per" | "global"
     "show_system_in_preview": True,
+    "show_global_apis_in_preview": True,        # only used when apis_scope == "global"
 }
 
-DEFAULT_APIS = '''# something in style API doc in python
+DEFAULT_APIS = '''# Example API doc
 def classify_image(img_array: np.array) -> str:
-    """classify the image into one of the 14 modalities and return the class
-    Args:
-        img_array: np.array, the np array of the image, in 3 dimension
-    Return:
-        res: str, the class of the image
-    """
+    """classify the image into one of the 14 modalities and return the class"""
 
 def read_rgb(img_path: str) -> np.array:
-    """read the rgb image from the file path and return a 3d array
-    Args:
-        img_path: str the path to the file
-    Return:
-        img_array: the image array in 3 dimension
-    """
+    """read the rgb image from the file path and return a 3d array"""
 '''
 
 DEFAULT_QUESTION = "What modality is this image?"
@@ -42,8 +34,8 @@ DEFAULT_CODE = '''def answer_code():
 '''
 DEFAULT_ANSWER = "MRI"
 
-# Superset of columns for preview
-COLUMNS = ["#", "answer", "question", "code", "apis", "instruction"]
+# Superset of columns for the dataset preview
+COLUMNS = ["#", "answer", "thought", "question", "code", "apis", "instruction"]
 
 # ---------- Helpers ----------
 def _truncate(s, max_len=120):
@@ -53,11 +45,12 @@ def _truncate(s, max_len=120):
 def _record_to_row(idx_one_based, record, max_len=120):
     return [
         idx_one_based,
-        record.get("answer", ""),
-        _truncate(record.get("question", ""), max_len),
-        _truncate(record.get("code", ""), max_len),
-        _truncate(record.get("apis", ""), max_len),
-        _truncate(record.get("system", ""), max_len),
+        (record.get("answer") or ""),
+        _truncate(record.get("thought") or "", max_len),
+        _truncate(record.get("question") or "", max_len),
+        _truncate(record.get("code") or "", max_len),
+        _truncate(record.get("apis") or "", max_len),     # empty if scope was global
+        _truncate(record.get("system") or "", max_len),
     ]
 
 def dataset_rows(state, max_len=120):
@@ -68,30 +61,36 @@ def _resolve_default_answer(answer):
     ans = (answer or "").strip()
     return DEFAULT_ANSWER if ans == "" else answer
 
-def _validate_inputs_template(tmpl, system, apis, question, code, answer):
+def _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer):
     """
-    Validate required fields based on template. 'Answer' may be blank,
-    as it will resolve to DEFAULT_ANSWER.
+    Validate required fields based on template & APIs scope.
+    'Answer' may be blank (resolves to DEFAULT_ANSWER). 'Thought' is optional.
     """
     missing = []
+    sections = set((tmpl or {}).get("include_sections", []))
+    scope = (tmpl or {}).get("apis_scope", "per")
     if not (system or "").strip():
         missing.append("System")
-    sections = set((tmpl or {}).get("include_sections", []))
-    if "APIs" in sections and not (apis or "").strip():
-        missing.append("APIs")
+    if scope == "global":
+        if not (global_apis or "").strip():
+            missing.append("Global APIs")
+    else:  # per-example
+        if "APIs" in sections and not (apis or "").strip():
+            missing.append("APIs (per-example)")
     if "Question" in sections and not (question or "").strip():
         missing.append("Question")
     if "Code" in sections and not (code or "").strip():
         missing.append("Code")
-    # Answer is optional at input time (blank -> default)
     if missing:
         return False, f"Please fill: {', '.join(missing)}."
     return True, ""
 
-def _build_text(tmpl, system, apis, question, code, answer):
-    """Render a formatted few-shot example according to the template."""
+def _build_text(tmpl, system, global_apis, apis, question, code, thought, answer):
+    """Render a formatted few-shot example according to the template & scope."""
     sections = set((tmpl or {}).get("include_sections", []))
+    scope = (tmpl or {}).get("apis_scope", "per")
     show_system = bool((tmpl or {}).get("show_system_in_preview", True))
+    show_global_apis = bool((tmpl or {}).get("show_global_apis_in_preview", True))
     answer = _resolve_default_answer(answer)
 
     blocks = []
@@ -101,7 +100,11 @@ def _build_text(tmpl, system, apis, question, code, answer):
         blocks.append(f"{idx}. Instruction\n<SYSTEM>{(system or '').strip()}</SYSTEM>\n")
         idx += 1
 
-    if "APIs" in sections:
+    if scope == "global" and show_global_apis:
+        blocks.append(f"{idx}. Tool APIs (Global)\n<APIs>\n{(global_apis or '').rstrip()}\n</APIs>\n")
+        idx += 1
+
+    if scope == "per" and "APIs" in sections:
         blocks.append(f"{idx}. Tool APIs\n<APIs>\n{(apis or '').rstrip()}\n</APIs>\n")
         idx += 1
 
@@ -113,43 +116,65 @@ def _build_text(tmpl, system, apis, question, code, answer):
         blocks.append(f"{idx}. The generated code\n<CODE>\n{(code or '').rstrip()}\n</CODE>\n")
         idx += 1
 
+    if "Thought" in sections:
+        # Thought is optional text; include block even if empty, for consistency
+        blocks.append(f"{idx}. Thought\n<THOUGHT>\n{(thought or '').strip()}\n</THOUGHT>\n")
+        idx += 1
+
     if "Answer" in sections:
         blocks.append(f"{idx}. Answer: {(answer or '').strip()}\n")
         idx += 1
 
     return "\n".join(blocks).strip()
 
-def render_preview_with_template(tmpl, system, apis, question, code, answer):
-    ok, msg = _validate_inputs_template(tmpl, system, apis, question, code, answer)
+def render_preview_with_template(tmpl, system, global_apis, apis, question, code, thought, answer):
+    ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
     if not ok:
         return msg, None
-    text = _build_text(tmpl, system, apis, question, code, answer)
+    text = _build_text(tmpl, system, global_apis, apis, question, code, thought, answer)
     return text, text
 
-def to_json_record_with_template(tmpl, system, apis, question, code, answer):
-    """Record contains only enabled sections. System stored too."""
+def to_json_record_with_template(tmpl, system, global_apis, apis, question, code, thought, answer):
+    """
+    Record contains only enabled per-example sections, plus 'system' always.
+    For global APIs scope, we also store a snapshot 'global_apis' on the record,
+    so viewing later reproduces the same preview even if the template changes.
+    """
     sections = set((tmpl or {}).get("include_sections", []))
+    scope = (tmpl or {}).get("apis_scope", "per")
     answer = _resolve_default_answer(answer)
-    rec = {"meta": {
-        "included_sections": list(sections),
-        "show_system_in_preview": bool((tmpl or {}).get("show_system_in_preview", True)),
-    }}
-    rec["system"] = system
-    if "APIs" in sections:
+
+    rec = {
+        "meta": {
+            "included_sections": list(sections),
+            "apis_scope": scope,
+            "show_system_in_preview": bool((tmpl or {}).get("show_system_in_preview", True)),
+            "show_global_apis_in_preview": bool((tmpl or {}).get("show_global_apis_in_preview", True)),
+        },
+        "system": system,
+    }
+
+    if scope == "global":
+        rec["global_apis"] = global_apis
+    elif "APIs" in sections:
         rec["apis"] = apis
+
     if "Question" in sections:
         rec["question"] = question
     if "Code" in sections:
         rec["code"] = code
+    if "Thought" in sections:
+        rec["thought"] = thought
     if "Answer" in sections:
         rec["answer"] = answer
+
     return rec
 
-def add_example_and_summarize_with_template(state, tmpl, system, apis, question, code, answer):
-    ok, msg = _validate_inputs_template(tmpl, system, apis, question, code, answer)
+def add_example_and_summarize_with_template(state, tmpl, system, global_apis, apis, question, code, thought, answer):
+    ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
     if not ok:
         return state, f"⚠️ {msg}", len(state), dataset_rows(state)
-    rec = to_json_record_with_template(tmpl, system, apis, question, code, answer)
+    rec = to_json_record_with_template(tmpl, system, global_apis, apis, question, code, thought, answer)
     new_state = list(state) + [rec]
     return new_state, "✅ Added example.", len(new_state), dataset_rows(new_state)
 
@@ -158,20 +183,24 @@ def _format_record_for_view(record):
     included = set(meta.get("included_sections") or [])
     tmpl = {
         "include_sections": list(included),
+        "apis_scope": meta.get("apis_scope", "per"),
         "show_system_in_preview": bool(meta.get("show_system_in_preview", True)),
+        "show_global_apis_in_preview": bool(meta.get("show_global_apis_in_preview", True)),
     }
     return _build_text(
         tmpl=tmpl,
         system=record.get("system"),
+        global_apis=record.get("global_apis"),
         apis=record.get("apis"),
         question=record.get("question"),
         code=record.get("code"),
+        thought=record.get("thought"),
         answer=record.get("answer"),
     )
 
 def get_example_detail(state, index_one_based):
     try:
-        idx = int(index_one_based)
+        idx = int(float(index_one_based))
     except Exception:
         return "Please enter a valid integer index."
     if idx < 1 or idx > len(state):
@@ -182,7 +211,7 @@ def get_example_detail(state, index_one_based):
 # -------- delete helpers --------
 def delete_example(state, index_one_based):
     try:
-        idx = int(index_one_based)
+        idx = int(float(index_one_based))
     except Exception:
         return state, "Please enter a valid integer index.", len(state)
     if idx < 1 or idx > len(state):
@@ -199,6 +228,7 @@ def export_jsonl_with_options(state, duplicate_system=True):
     """
     Export dataset to JSONL (per-line records).
     If duplicate_system=True, keep 'system' in each record; otherwise remove it.
+    Global APIs snapshots (if present) remain on the records.
     """
     if not state:
         return None, "No examples to export yet."
@@ -212,24 +242,34 @@ def export_jsonl_with_options(state, duplicate_system=True):
             f.write(json.dumps(out, ensure_ascii=False) + "\n")
     return path, f"📦 Exported {len(state)} records → {path}"
 
-def export_single_json_object(state, system_text):
+def export_single_json_object(state, system_text, template, global_apis_from_ui):
     """
     Export a single JSON object:
     {
       "system": <string>,
-      "example": [ {apis?, question?, code?, answer?}, ... ]
+      "apis": <string?>,           # present when apis_scope == "global"
+      "example": [ {apis?, question?, code?, thought?, answer?}, ... ]
     }
+
+    Note: if current template uses global APIs, per-example 'apis' are omitted
+    in the 'example' array; otherwise (per-example scope) they are included when present.
     """
     if not state:
         return None, "No examples to export yet."
 
+    scope = (template or {}).get("apis_scope", "per")
     obj = {"system": system_text, "example": []}
+    if scope == "global":
+        obj["apis"] = global_apis_from_ui
+
     for rec in state:
         ex = {}
-        # Only include sections that exist in the saved record
-        if "apis" in rec:     ex["apis"] = rec["apis"]
+        # Include per-example APIs only when scope is "per"
+        if scope == "per" and "apis" in rec:
+            ex["apis"] = rec["apis"]
         if "question" in rec: ex["question"] = rec["question"]
         if "code" in rec:     ex["code"] = rec["code"]
+        if "thought" in rec:  ex["thought"] = rec["thought"]
         if "answer" in rec:   ex["answer"] = rec["answer"]
         obj["example"].append(ex)
 

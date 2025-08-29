@@ -8,6 +8,7 @@ from builder_utils import (
     DEFAULT_CODE,
     DEFAULT_ANSWER,
     COLUMNS,
+    # core ops
     render_preview_with_template,
     add_example_and_summarize_with_template,
     get_example_detail,
@@ -20,13 +21,13 @@ def build_app():
     with gr.Blocks(title="Few-shot Prompt Builder — Custom Template", theme=gr.themes.Soft()) as demo:
         gr.Markdown(
             "## 🧪 Few-shot Prompt Builder — Custom Template\n"
-            "Use a single System message and choose which sections your few-shot examples include."
+            "Use a single System message, choose APIs scope (global or per-example), and include optional THOUGHT blocks."
         )
 
         # States
-        dataset_state = gr.State([])              # list[dict]
+        dataset_state = gr.State([])                 # list[dict]
         template_state = gr.State(DEFAULT_TEMPLATE.copy())
-        keep_system_state = gr.State(True)        # hidden bool for JSONL export
+        keep_system_state = gr.State(True)           # hidden bool for JSONL export
 
         with gr.Tabs():
             # -------------------- Template Tab --------------------
@@ -39,23 +40,46 @@ def build_app():
                             lines=6,
                             placeholder="Your SYSTEM prompt here..."
                         )
+
+                        apis_scope = gr.Radio(
+                            label="APIs scope",
+                            choices=["Per-example", "Global (one-time)"],
+                            value=("Global (one-time)" if DEFAULT_TEMPLATE["apis_scope"] == "global" else "Per-example"),
+                        )
+
+                        global_apis = gr.Code(
+                            label="Global APIs (shown when scope is Global)",
+                            value=DEFAULT_APIS,
+                            language="python",
+                            lines=14,
+                            visible=(DEFAULT_TEMPLATE["apis_scope"] == "global",),
+                        )
+
                         include_sections = gr.CheckboxGroup(
-                            label="Sections to include in each example",
-                            choices=["APIs", "Question", "Code", "Answer"],
+                            label="Sections to include in EACH example",
+                            choices=["APIs", "Question", "Code", "Thought", "Answer"],
                             value=DEFAULT_TEMPLATE["include_sections"],
                         )
+
                         show_system_in_preview = gr.Checkbox(
                             label="Show System at top of previews",
                             value=DEFAULT_TEMPLATE["show_system_in_preview"]
                         )
+                        show_global_apis_in_preview = gr.Checkbox(
+                            label="Show Global APIs at top (when scope is Global)",
+                            value=DEFAULT_TEMPLATE["show_global_apis_in_preview"]
+                        )
+
                         apply_btn = gr.Button("✅ Apply template settings", variant="primary")
                         template_feedback = gr.Textbox(label="Template status", interactive=False)
 
                     with gr.Column(scale=1):
                         gr.Markdown(
                             "### How it works\n"
-                            "- Toggle which sections **exist** in each example\n"
-                            "- The **Single Example** tab will show/hide inputs accordingly"
+                            "- **APIs scope** controls where APIs live: per-example or one-time global.\n"
+                            "- If *Global*, the example input for APIs is hidden and previews/exports use the Global block.\n"
+                            "- Enable **Thought** to inject a `<THOUGHT>...</THOUGHT>` section per example.\n"
+                            "- Single-object export becomes `{ system, apis?, example: [...] }`."
                         )
 
             # -------------------- Single Example Tab --------------------
@@ -63,11 +87,11 @@ def build_app():
                 with gr.Row():
                     with gr.Column(scale=1):
                         apis = gr.Code(
-                            label="APIs (Python doc / signatures)",
+                            label="APIs (per-example)",
                             value=DEFAULT_APIS,
                             language="python",
-                            lines=14,
-                            visible=("APIs" in DEFAULT_TEMPLATE["include_sections"])
+                            lines=12,
+                            visible=("APIs" in DEFAULT_TEMPLATE["include_sections"] and DEFAULT_TEMPLATE["apis_scope"] == "per"),
                         )
                         question = gr.Textbox(
                             label="Question",
@@ -81,6 +105,13 @@ def build_app():
                             language="python",
                             lines=10,
                             visible=("Code" in DEFAULT_TEMPLATE["include_sections"])
+                        )
+                        thought = gr.Textbox(
+                            label="Thought (optional)",
+                            value="",
+                            placeholder="Step-by-step plan or rationale to include inside <THOUGHT> ... </THOUGHT>",
+                            lines=4,
+                            visible=("Thought" in DEFAULT_TEMPLATE["include_sections"])
                         )
                         # Smart default Answer: empty means use DEFAULT_ANSWER
                         answer = gr.Textbox(
@@ -97,13 +128,13 @@ def build_app():
                         feedback_single = gr.Textbox(label="Single Example status", lines=2, interactive=False)
 
                     with gr.Column(scale=1):
-                        preview = gr.Textbox(label="Formatted Example Preview", lines=32)
+                        preview = gr.Textbox(label="Formatted Example Preview", lines=34)
                         copy_helper = gr.Textbox(label="(Hidden) Raw", visible=False)
                         gr.Markdown("Tip: copy from the preview box after rendering.")
 
                 preview_btn.click(
                     render_preview_with_template,
-                    inputs=[template_state, system_global, apis, question, code, answer],
+                    inputs=[template_state, system_global, global_apis, apis, question, code, thought, answer],
                     outputs=[preview, copy_helper]
                 )
 
@@ -205,47 +236,54 @@ def build_app():
                     export_json_status = gr.Textbox(label="Export status", lines=2)
                 export_json_btn.click(
                     export_single_json_object,
-                    inputs=[dataset_state, system_global],
+                    inputs=[dataset_state, system_global, template_state, global_apis],
                     outputs=[export_json_file, export_json_status]
                 )
 
-        # ---------- Template apply wiring (toggles Single Example visibility)
-        def _apply_template(includes, show_sys, tmpl_state):
+        # ---------- Template apply wiring (toggles Single Example & global APIs visibility)
+        def _apply_template(includes, scope_label, show_sys, show_global_apis, tmpl_state):
+            scope = "global" if scope_label.startswith("Global") else "per"
             if not includes:
                 includes = []
             new_state = {
                 "include_sections": includes,
+                "apis_scope": scope,
                 "show_system_in_preview": bool(show_sys),
+                "show_global_apis_in_preview": bool(show_global_apis),
             }
             tmpl_state = new_state
             return (
                 tmpl_state,
                 "✅ Template applied.",
-                gr.update(visible=("APIs" in includes)),
-                gr.update(visible=("Question" in includes)),
-                gr.update(visible=("Code" in includes)),
-                gr.update(visible=("Answer" in includes)),
+                # visibility updates for Single Example inputs:
+                gr.update(visible=("APIs" in includes and scope == "per")),  # apis (per-example)
+                gr.update(visible=("Question" in includes)),                 # question
+                gr.update(visible=("Code" in includes)),                     # code
+                gr.update(visible=("Thought" in includes)),                  # thought
+                gr.update(visible=("Answer" in includes)),                   # answer
+                # show/hide Global APIs editor in Template tab:
+                gr.update(visible=(scope == "global")),
             )
 
         apply_btn.click(
             _apply_template,
-            inputs=[include_sections, show_system_in_preview, template_state],
-            outputs=[template_state, template_feedback, apis, question, code, answer],
+            inputs=[include_sections, apis_scope, show_system_in_preview, show_global_apis_in_preview, template_state],
+            outputs=[template_state, template_feedback, apis, question, code, thought, answer, global_apis],
         )
 
-        # Add example uses current template + system
+        # Add example uses current template + system + global/per APIs
         add_btn.click(
             add_example_and_summarize_with_template,
-            inputs=[dataset_state, template_state, system_global, apis, question, code, answer],
+            inputs=[dataset_state, template_state, system_global, global_apis, apis, question, code, thought, answer],
             outputs=[dataset_state, feedback_single, count, dataset_table]
         )
 
         gr.Markdown(
             "—\n"
-            "**Tips**\n"
-            "- Type a number or use arrow keys; the index will snap to a valid integer.\n"
-            "- Click **View Selected** anytime; the value is clamped and the viewer updates.\n"
-            "- Deleting an item keeps the index valid and refreshes the preview."
+            "**Notes**\n"
+            "- If APIs scope is **Global**, the top preview can include the Global APIs block and examples won’t ask for APIs.\n"
+            "- **Thought** renders inside `<THOUGHT> ... </THOUGHT>` if enabled.\n"
+            "- **Export JSON (single object)** yields `{ system, apis?, example: [...] }`."
         )
 
     return demo
