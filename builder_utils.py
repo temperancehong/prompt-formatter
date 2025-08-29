@@ -127,12 +127,36 @@ def _build_text(tmpl, system, global_apis, apis, question, code, thought, answer
 
     return "\n".join(blocks).strip()
 
+# def render_preview_with_template(tmpl, system, global_apis, apis, question, thought, code, answer):
+#     ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
+#     if not ok:
+#         return msg, None
+#     text = _build_text(tmpl, system, global_apis, apis, question, code, thought, answer)
+#     return text, text
 def render_preview_with_template(tmpl, system, global_apis, apis, question, thought, code, answer):
+    # Only keep fields that are enabled in the template
+    sections = set((tmpl or {}).get("include_sections", []))
+    scope = (tmpl or {}).get("apis_scope", "per")
+
+    if scope != "global" and "APIs" not in sections:
+        apis = ""
+    if "Question" not in sections:
+        question = ""
+    if "Code" not in sections:
+        code = ""
+    if "Thought" not in sections:
+        thought = ""
+    if "Answer" not in sections:
+        answer = ""
+
     ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
     if not ok:
         return msg, None
+
+    # NOTE: _build_text expects args in the order (..., question, code, thought, answer)
     text = _build_text(tmpl, system, global_apis, apis, question, code, thought, answer)
     return text, text
+
 
 def to_json_record_with_template(tmpl, system, global_apis, apis, question, code, thought, answer):
     """
