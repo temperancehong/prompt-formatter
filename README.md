@@ -30,6 +30,18 @@ This is a helpful tool that I built to facilitate Python code synthesis VQA task
 
 [Link to current version live demo](https://huggingface.co/spaces/temperancehong/few-shot-prompt-formatter)
 
+For each example, it contains `apis`, `question`, `code` and `answer` as key choices. You can select a few of them or all of them for each example.
+
+```json
+{
+  "system": "…",
+  "example": [
+    {"apis": "…", "question": "…", "code": "…", "answer": "…"},
+    {"question": "…", "answer": "…"}
+  ]
+}
+```
+
 For now the prompt is in the following format:
 ```PlainText
 1. Instruction
@@ -56,12 +68,11 @@ def read_rgb(img_path: str) -> np.array:
 </APIs>
 
 3. The VQA question:
-What modality is this image? The image is in the path path/to/the/image
+What modality is this image?
 
 4. The generated code
 <CODE>
 def answer_code():
-    img_array = read_rgb("path/to/the/image")
     cls = classify_image(img_array)
     return cls
 </CODE>
@@ -70,9 +81,10 @@ def answer_code():
 ```
 
 The interface has mainly two parts: 
+1. `Template`: where you choose your template for building the examples. You can then click `✅ Apply template settings` to apply and continue to the next Tab.
 1. `Single example`: where you enter your text, build your prompt in a click, and then preview the formatted prompt. Also within a click, you can add this single prompt to your few-shot prompt list.
-2. `Prompt Set Builder`: you can see the few-shot examples you added to the list, you can export the whole list to a json file.
+2. `Prompt Set Builder`: you can see the few-shot examples you added to the list, you can export the whole list to a `JSON` file. You can also export to `JSONL` files, where each line is one example, where each lines has the system prompts.
 
 ## Versions
 - 28 August 2025: initial version
-- To be updated
+- 29 August 2025: With the display prompt example, you can select which fields to fill in the example
