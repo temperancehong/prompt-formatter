@@ -85,7 +85,7 @@ def _validate_inputs_template(tmpl, system, global_apis, apis, question, code, a
         return False, f"Please fill: {', '.join(missing)}."
     return True, ""
 
-def _build_text(tmpl, system, global_apis, apis, question, code, thought, answer):
+def _build_text(tmpl, system, global_apis, apis, question, thought, code, answer):
     """Render a formatted few-shot example according to the template & scope."""
     sections = set((tmpl or {}).get("include_sections", []))
     scope = (tmpl or {}).get("apis_scope", "per")
@@ -131,7 +131,7 @@ def _build_text(tmpl, system, global_apis, apis, question, code, thought, answer
 #     ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
 #     if not ok:
 #         return msg, None
-#     text = _build_text(tmpl, system, global_apis, apis, question, code, thought, answer)
+#     text = _build_text(tmpl, system, global_apis, apis, question, thought, code, answer)
 #     return text, text
 def render_preview_with_template(tmpl, system, global_apis, apis, question, thought, code, answer):
     # Only keep fields that are enabled in the template
@@ -153,12 +153,12 @@ def render_preview_with_template(tmpl, system, global_apis, apis, question, thou
     if not ok:
         return msg, None
 
-    # NOTE: _build_text expects args in the order (..., question, code, thought, answer)
-    text = _build_text(tmpl, system, global_apis, apis, question, code, thought, answer)
+    # NOTE: _build_text expects args in the order (..., question, thought, code, answer)
+    text = _build_text(tmpl, system, global_apis, apis, question, thought, code, answer)
     return text, text
 
 
-def to_json_record_with_template(tmpl, system, global_apis, apis, question, code, thought, answer):
+def to_json_record_with_template(tmpl, system, global_apis, apis, question, thought, code, answer):
     """
     Record contains only enabled per-example sections, plus 'system' always.
     For global APIs scope, we also store a snapshot 'global_apis' on the record,
@@ -194,11 +194,11 @@ def to_json_record_with_template(tmpl, system, global_apis, apis, question, code
 
     return rec
 
-def add_example_and_summarize_with_template(state, tmpl, system, global_apis, apis, question, code, thought, answer):
+def add_example_and_summarize_with_template(state, tmpl, system, global_apis, apis, question, thought, code, answer):
     ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
     if not ok:
         return state, f"⚠️ {msg}", len(state), dataset_rows(state)
-    rec = to_json_record_with_template(tmpl, system, global_apis, apis, question, code, thought, answer)
+    rec = to_json_record_with_template(tmpl, system, global_apis, apis, question, thought, code, answer)
     new_state = list(state) + [rec]
     return new_state, "✅ Added example.", len(new_state), dataset_rows(new_state)
 
