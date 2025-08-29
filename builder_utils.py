@@ -62,27 +62,12 @@ def _resolve_default_answer(answer):
 
 def _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer):
     """
-    Validate required fields based on template & APIs scope.
-    'Answer' may be blank (resolves to DEFAULT_ANSWER). 'Thought' is optional.
+    Only 'System' is required. All other sections are optional even if enabled.
     """
-    missing = []
-    sections = set((tmpl or {}).get("include_sections", []))
-    scope = (tmpl or {}).get("apis_scope", "per")
     if not (system or "").strip():
-        missing.append("System")
-    if scope == "global":
-        if not (global_apis or "").strip():
-            missing.append("Global APIs")
-    else:  # per-example
-        if "APIs" in sections and not (apis or "").strip():
-            missing.append("APIs (per-example)")
-    if "Question" in sections and not (question or "").strip():
-        missing.append("Question")
-    if "Code" in sections and not (code or "").strip():
-        missing.append("Code")
-    if missing:
-        return False, f"Please fill: {', '.join(missing)}."
+        return False, "Please fill: System."
     return True, ""
+
 
 def _build_text(tmpl, system, global_apis, apis, question, thought, code, answer):
     """Render a formatted few-shot example according to the template & scope.
@@ -101,23 +86,23 @@ def _build_text(tmpl, system, global_apis, apis, question, thought, code, answer
         blocks.append(f"{idx}. Instruction\n<SYSTEM>{(system or '').strip()}</SYSTEM>\n")
         idx += 1
 
-    if scope == "global" and show_global_apis:
+    if scope == "global" and show_global_apis and (global_apis or "").strip():
         blocks.append(f"{idx}. Tool APIs (Global)\n<APIs>\n{(global_apis or '').rstrip()}\n</APIs>\n")
         idx += 1
 
-    if scope == "per" and "APIs" in sections:
+    if scope == "per" and "APIs" in sections and (apis or "").strip():
         blocks.append(f"{idx}. Tool APIs\n<APIs>\n{(apis or '').rstrip()}\n</APIs>\n")
         idx += 1
 
-    if "Question" in sections:
+    if "Question" in sections and (question or "").strip():
         blocks.append(f"{idx}. The VQA question:\n{(question or '').strip()}\n")
         idx += 1
 
-    if "Thought" in sections:
+    if "Thought" in sections and (thought or "").strip():
         blocks.append(f"{idx}. Thought\n<THOUGHT>\n{(thought or '').strip()}\n</THOUGHT>\n")
         idx += 1
 
-    if "Code" in sections:
+    if "Code" in sections and (code or "").strip():
         blocks.append(f"{idx}. The generated code\n<CODE>\n{(code or '').rstrip()}\n</CODE>\n")
         idx += 1
 
@@ -171,16 +156,16 @@ def to_json_record_with_template(tmpl, system, global_apis, apis, question, thou
         "system": system,
     }
 
-    if scope == "global":
+    if scope == "global" and (global_apis or "").strip():
         rec["global_apis"] = global_apis
-    elif "APIs" in sections:
+    elif "APIs" in sections and (apis or "").strip():
         rec["apis"] = apis
 
-    if "Question" in sections:
+    if "Question" in sections and (question or "").strip():
         rec["question"] = question
-    if "Thought" in sections:
+    if "Thought" in sections and (thought or "").strip():
         rec["thought"] = thought
-    if "Code" in sections:
+    if "Code" in sections and (code or "").strip():
         rec["code"] = code
     if "Answer" in sections:
         rec["answer"] = answer
