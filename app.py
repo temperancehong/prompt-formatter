@@ -57,7 +57,7 @@ def build_app():
 
                         include_sections = gr.CheckboxGroup(
                             label="Sections to include in EACH example",
-                            choices=["APIs", "Question", "Code", "Thought", "Answer"],
+                            choices=["APIs", "Question","Thought", "Code",  "Answer"],
                             value=DEFAULT_TEMPLATE["include_sections"],
                         )
 
@@ -99,13 +99,6 @@ def build_app():
                             lines=2,
                             visible=("Question" in DEFAULT_TEMPLATE["include_sections"])
                         )
-                        code = gr.Code(
-                            label="Code",
-                            value=DEFAULT_CODE,
-                            language="python",
-                            lines=10,
-                            visible=("Code" in DEFAULT_TEMPLATE["include_sections"])
-                        )
                         thought = gr.Textbox(
                             label="Thought (optional)",
                             value="",
@@ -113,6 +106,14 @@ def build_app():
                             lines=4,
                             visible=("Thought" in DEFAULT_TEMPLATE["include_sections"])
                         )
+                        code = gr.Code(
+                            label="Code",
+                            value=DEFAULT_CODE,
+                            language="python",
+                            lines=10,
+                            visible=("Code" in DEFAULT_TEMPLATE["include_sections"])
+                        )
+                        
                         # Smart default Answer: empty means use DEFAULT_ANSWER
                         answer = gr.Textbox(
                             label="Answer",
@@ -258,8 +259,8 @@ def build_app():
                 # visibility updates for Single Example inputs:
                 gr.update(visible=("APIs" in includes and scope == "per")),  # apis (per-example)
                 gr.update(visible=("Question" in includes)),                 # question
-                gr.update(visible=("Code" in includes)),                     # code
                 gr.update(visible=("Thought" in includes)),                  # thought
+                gr.update(visible=("Code" in includes)),                     # code
                 gr.update(visible=("Answer" in includes)),                   # answer
                 # show/hide Global APIs editor in Template tab:
                 gr.update(visible=(scope == "global")),
@@ -268,13 +269,13 @@ def build_app():
         apply_btn.click(
             _apply_template,
             inputs=[include_sections, apis_scope, show_system_in_preview, show_global_apis_in_preview, template_state],
-            outputs=[template_state, template_feedback, apis, question, code, thought, answer, global_apis],
+            outputs=[template_state, template_feedback, apis, question, thought, code, answer, global_apis],
         )
 
         # Add example uses current template + system + global/per APIs
         add_btn.click(
             add_example_and_summarize_with_template,
-            inputs=[dataset_state, template_state, system_global, global_apis, apis, question, code, thought, answer],
+            inputs=[dataset_state, template_state, system_global, global_apis, apis, question, thought, code, answer],
             outputs=[dataset_state, feedback_single, count, dataset_table]
         )
 
