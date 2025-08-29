@@ -135,7 +135,7 @@ def build_app():
 
                 preview_btn.click(
                     render_preview_with_template,
-                    inputs=[template_state, system_global, global_apis, apis, question, code, thought, answer],
+                    inputs=[template_state, system_global, global_apis, apis, question, thought, code, answer],
                     outputs=[preview, copy_helper]
                 )
 
