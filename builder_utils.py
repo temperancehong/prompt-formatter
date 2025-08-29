@@ -127,7 +127,7 @@ def _build_text(tmpl, system, global_apis, apis, question, code, thought, answer
 
     return "\n".join(blocks).strip()
 
-def render_preview_with_template(tmpl, system, global_apis, apis, question, code, thought, answer):
+def render_preview_with_template(tmpl, system, global_apis, apis, question, thought, code, answer):
     ok, msg = _validate_inputs_template(tmpl, system, global_apis, apis, question, code, answer)
     if not ok:
         return msg, None
