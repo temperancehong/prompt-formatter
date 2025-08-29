@@ -112,13 +112,13 @@ def _build_text(tmpl, system, global_apis, apis, question, code, thought, answer
         blocks.append(f"{idx}. The VQA question:\n{(question or '').strip()}\n")
         idx += 1
 
-    if "Code" in sections:
-        blocks.append(f"{idx}. The generated code\n<CODE>\n{(code or '').rstrip()}\n</CODE>\n")
-        idx += 1
-
     if "Thought" in sections:
         # Thought is optional text; include block even if empty, for consistency
         blocks.append(f"{idx}. Thought\n<THOUGHT>\n{(thought or '').strip()}\n</THOUGHT>\n")
+        idx += 1
+
+    if "Code" in sections:
+        blocks.append(f"{idx}. The generated code\n<CODE>\n{(code or '').rstrip()}\n</CODE>\n")
         idx += 1
 
     if "Answer" in sections:
