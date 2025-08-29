@@ -1,0 +1,17 @@
+{
+  "system": "You are a helpful radiology assistant. Here I have one image, and please answer me the question by first providing your step by step thoughts in natural language using the supported actions provided in the Python code APIs, and then output the corresponding consistant code that use the APIs provided step by step. Finally, you execute the code, show me the intermediate results and the final answer, and then give me the response.",
+  "example": [
+    {
+      "apis": "# something in style API doc in python\ndef classify_image(img_array: np.array) -> str:\n    \"\"\"classify the image into one of the 14 modalities and return the class\n    Args:\n        img_array: np.array, the np array of the image, in 3 dimension\n    Return:\n        res: str, the class of the image\n    \"\"\"\n\ndef read_rgb(img_path: str) -> np.array:\n    \"\"\"read the rgb image from the file path and return a 3d array\n    Args:\n        img_path: str the path to the file\n    Return:\n        img_array: the image array in 3 dimension\n    \"\"\"",
+      "question": "What modality is this image?",
+      "code": "def answer_code():\n    return 1",
+      "answer": "None"
+    },
+    {
+      "apis": "# something in style API doc in python\ndef classify_image(img_array: np.array) -> str:\n    \"\"\"classify the image into one of the 14 modalities and return the class\n    Args:\n        img_array: np.array, the np array of the image, in 3 dimension\n    Return:\n        res: str, the class of the image\n    \"\"\"\n\ndef read_rgb(img_path: str) -> np.array:\n    \"\"\"read the rgb image from the file path and return a 3d array\n    Args:\n        img_path: str the path to the file\n    Return:\n        img_array: the image array in 3 dimension\n    \"\"\"",
+      "question": "question2 ",
+      "code": "def answer_code():\n    return 2",
+      "answer": "None1"
+    }
+  ]
+}
