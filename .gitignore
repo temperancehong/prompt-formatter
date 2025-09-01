@@ -1,0 +1,46 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+*.tlog
+*.etl
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+__pycache__/*
+*.jsonl
+*.json
+*.png
+*.jpg
+
+# README.md
+
+# venv
+venv/
+env/
+.venv/
+.env/
+
+
+# Build files
+dist/
+build/
+out/
+*.exe
+*.dll
+*.so
+*.dylib
+*.pyc
+*.pyo
+*.class
